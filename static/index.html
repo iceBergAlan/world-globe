@@ -199,10 +199,11 @@
   @media (max-width: 768px) {
     #card {
       position: fixed !important; left: 10px !important; right: 10px !important;
-      bottom: 80px !important; top: auto !important; width: auto !important;
+      bottom: 110px !important; top: auto !important; width: auto !important;
       max-width: none !important;
     }
-    #rank-modal { left: 10px; right: 10px; width: auto; top: auto; bottom: 80px; transform: none; }
+    #rank-modal { left: 10px; right: 10px; width: auto; top: auto; bottom: 110px; transform: none; }
+    #toolbar { bottom: 60px; }
     #panel {
       display: block !important;
       position: fixed; bottom: 0; left: 0; right: 0; top: auto;
@@ -214,7 +215,7 @@
       display: flex; flex-direction: row; gap: 8px; width: 100%;
       overflow-x: auto; padding: 8px 12px;
       border-radius: 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);
-      flex-wrap: nowrap;
+      flex-wrap: nowrap; scroll-behavior: smooth;
     }
     #panel.collapsed { right: 0 !important; }
     .chip-group { flex-direction: row; gap: 6px; flex-shrink: 0; }
@@ -403,7 +404,12 @@ function updateNouns(adj) {
 function toggleAdj(el, val) {
   document.querySelectorAll('.chip-group:nth-child(1) .chip').forEach(c => c.classList.remove('active'));
   if (selAdj === val) { selAdj = ''; updateNouns(''); }
-  else { selAdj = val; el.classList.add('active'); updateNouns(val); }
+  else {
+    selAdj = val; el.classList.add('active'); updateNouns(val);
+    // 手机端：滚动到名词区域
+    const nounGroup = document.querySelectorAll('.chip-group')[1];
+    if (nounGroup) nounGroup.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+  }
   syncQuery();
 }
 
