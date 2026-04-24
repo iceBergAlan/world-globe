@@ -11,10 +11,24 @@
 
   /* 右侧面板 */
   #panel {
-    position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
-    z-index: 10; display: flex; flex-direction: column; gap: 16px;
-    width: 160px;
+    position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+    z-index: 10; display: flex; flex-direction: row; align-items: center;
+    transition: right 0.4s ease;
   }
+  #panel.collapsed { right: -160px; }
+  #panel-content {
+    display: flex; flex-direction: column; gap: 16px; width: 160px;
+    background: rgba(10,10,26,0.7); padding: 16px 12px; border-radius: 12px 0 0 12px;
+    backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); border-right: none;
+  }
+  #panel-toggle {
+    width: 20px; height: 48px; background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2); border-right: none;
+    border-radius: 8px 0 0 8px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; color: #aaa; font-size: 12px;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  #panel-toggle:hover { background: rgba(255,255,255,0.2); color: #fff; }
 
   .chip-group { display: flex; flex-direction: column; gap: 6px; }
   .chip-label { font-size: 11px; color: rgba(255,255,255,0.4); padding-left: 4px; margin-bottom: 2px; }
@@ -30,6 +44,9 @@
     background: rgba(79,142,247,0.35);
     border-color: #4f8ef7;
     color: #7eb8ff;
+  }
+  .chip.disabled {
+    opacity: 0.3; cursor: not-allowed; pointer-events: none;
   }
 
   /* 顶部搜索栏 */
@@ -179,6 +196,17 @@
     50%  { transform: rotate(15deg) translateY(3px); }
     100% { transform: rotate(-15deg) translateY(0); }
   }
+  @media (max-width: 768px) {
+    #card {
+      position: fixed !important; left: 10px !important; right: 10px !important;
+      bottom: 10px !important; top: auto !important; width: auto !important;
+      max-width: none !important;
+    }
+    #rank-modal { left: 10px; right: 10px; width: auto; top: auto; bottom: 10px; transform: none; }
+    #panel { display: none; }
+    #topbar { width: 90%; }
+    #query { width: 200px; }
+  }
 </style>
 </head>
 <body>
@@ -190,21 +218,24 @@
 
 <!-- 右侧拼接面板 -->
 <div id="panel">
-  <div class="chip-group">
-    <div class="chip-label">形容词</div>
-    <div class="chip" onclick="toggleAdj(this,'最辣')">🌶 最辣</div>
-    <div class="chip" onclick="toggleAdj(this,'最奇葩')">🤪 最奇葩</div>
-    <div class="chip" onclick="toggleAdj(this,'最可爱')">🥰 最可爱</div>
-    <div class="chip" onclick="toggleAdj(this,'最难吃')">🤢 最难吃</div>
-    <div class="chip" onclick="toggleAdj(this,'最贵')">💰 最贵</div>
-  </div>
-  <div class="chip-group">
-    <div class="chip-label">主题</div>
-    <div class="chip" onclick="toggleNoun(this,'的食物')">🍜 食物</div>
-    <div class="chip" onclick="toggleNoun(this,'的酒店')">🏨 酒店</div>
-    <div class="chip" onclick="toggleNoun(this,'的辣椒')">🌶 辣椒</div>
-    <div class="chip" onclick="toggleNoun(this,'的厕所')">🚽 厕所</div>
-    <div class="chip" onclick="toggleNoun(this,'的动物')">🐾 动物</div>
+  <div id="panel-toggle" onclick="togglePanel()">‹</div>
+  <div id="panel-content">
+    <div class="chip-group">
+      <div class="chip-label">🌏</div>
+      <div class="chip" onclick="toggleAdj(this,'最辣')">🌶 最辣</div>
+      <div class="chip" onclick="toggleAdj(this,'最奇葩')">🤪 最奇葩</div>
+      <div class="chip" onclick="toggleAdj(this,'最可爱')">🥰 最可爱</div>
+      <div class="chip" onclick="toggleAdj(this,'最难吃')">🤢 最难吃</div>
+      <div class="chip" onclick="toggleAdj(this,'最高的')">🏔 最高的</div>
+    </div>
+    <div class="chip-group">
+      <div class="chip-label">👀</div>
+      <div class="chip" onclick="toggleNoun(this,'的食物')">🍜 食物</div>
+      <div class="chip" onclick="toggleNoun(this,'的酒店')">🏨 酒店</div>
+      <div class="chip" onclick="toggleNoun(this,'的辣椒')">🌶 辣椒</div>
+      <div class="chip" onclick="toggleNoun(this,'的厕所')">🚽 厕所</div>
+      <div class="chip" onclick="toggleNoun(this,'的动物')">🐾 动物</div>
+    </div>
   </div>
 </div>
 
@@ -284,12 +315,79 @@ globe.controls().autoRotate = true;
 globe.controls().autoRotateSpeed = 0.4;
 
 // 拼接词状态
+let allItems = [];
+
 let selAdj = '', selNoun = '';
+let panelTimer = null;
+
+// 2s 后自动收起面板
+function scheduleCollapse() {
+  clearTimeout(panelTimer);
+  panelTimer = setTimeout(() => {
+    document.getElementById('panel').classList.add('collapsed');
+    document.getElementById('panel-toggle').textContent = '›';
+  }, 2000);
+}
+
+function togglePanel() {
+  const panel = document.getElementById('panel');
+  const btn = document.getElementById('panel-toggle');
+  if (panel.classList.contains('collapsed')) {
+    panel.classList.remove('collapsed');
+    btn.textContent = '‹';
+    // 只有鼠标不在面板上时才启动计时
+    if (!panel.matches(':hover')) scheduleCollapse();
+  } else {
+    panel.classList.add('collapsed');
+    btn.textContent = '›';
+    clearTimeout(panelTimer);
+  }
+}
+
+// 页面加载 2s 后自动收起
+scheduleCollapse();
+
+// 鼠标悬浮时暂停收起，离开时重新计时
+document.getElementById('panel').addEventListener('mouseenter', () => clearTimeout(panelTimer));
+document.getElementById('panel').addEventListener('mouseleave', () => {
+  if (!document.getElementById('panel').classList.contains('collapsed')) scheduleCollapse();
+});
+
+// 形容词 → 相关主题映射
+const NOUN_MAP = {
+  '最好吃': [['🍎 水果','的水果'],['🍞 面包','的面包'],['🍜 食物','的食物'],['🍰 甜点','的甜点'],['🥩 肉类','的肉类']],
+  '最难吃': [['🍜 食物','的食物'],['🐟 海鲜','的海鲜'],['🧀 奶酪','的奶酪'],['🥬 蔬菜','的蔬菜'],['🍵 饮料','的饮料']],
+  '最辣':   [['🌶 辣椒','的辣椒'],['🍜 食物','的食物'],['🍛 咖喱','的咖喱'],['🥘 炖菜','的炖菜'],['🍕 小吃','的街头小吃']],
+  '最高的': [['🏔 山','的山'],['🌊 湖','的湖'],['🏙 建筑','的建筑'],['🌲 树','的树'],['🧗 人','的人']],
+  '最奇葩': [['🚽 厕所','的厕所'],['🏨 酒店','的酒店'],['🐾 动物','的动物'],['⚖️ 法律','的法律'],['🎭 节日','的节日']],
+  '最可爱': [['🐾 动物','的动物'],['🌸 植物','的植物'],['🍰 工作','的工作'],['👶 婴儿','的婴儿用品'],['🐱 宠物','的宠物']],
+  '最危险': [['🐾 动物','的动物'],['🌋 地方','的地方'],['🍄 植物','的植物'],['🏄 运动','的运动'],['🦠 生物','的生物']],
+};
+const DEFAULT_NOUNS = [['🍜 食物','的食物'],['🏨 酒店','的酒店'],['🌶 辣椒','的辣椒'],['🚽 厕所','的厕所'],['🐾 动物','的动物']];
+
+// 初始化名词置灰（需在 DOM 加载后执行）
+document.addEventListener('DOMContentLoaded', () => updateNouns(''));
+
+function updateNouns(adj) {
+  const nouns = NOUN_MAP[adj] || DEFAULT_NOUNS;
+  const group = document.querySelectorAll('.chip-group')[1];
+  const chips = group.querySelectorAll('.chip');
+  const disabled = !adj;
+  nouns.forEach(([label, val], i) => {
+    if (chips[i]) {
+      chips[i].textContent = label;
+      chips[i].onclick = function() { toggleNoun(this, val); };
+      chips[i].classList.remove('active');
+      chips[i].classList.toggle('disabled', disabled);
+    }
+  });
+  selNoun = '';
+}
 
 function toggleAdj(el, val) {
   document.querySelectorAll('.chip-group:nth-child(1) .chip').forEach(c => c.classList.remove('active'));
-  if (selAdj === val) { selAdj = ''; }
-  else { selAdj = val; el.classList.add('active'); }
+  if (selAdj === val) { selAdj = ''; updateNouns(''); }
+  else { selAdj = val; el.classList.add('active'); updateNouns(val); }
   syncQuery();
 }
 
@@ -298,6 +396,7 @@ function toggleNoun(el, val) {
   if (selNoun === val) { selNoun = ''; }
   else { selNoun = val; el.classList.add('active'); }
   syncQuery();
+  if (selAdj && selNoun) search();
 }
 
 function syncQuery() {
@@ -459,10 +558,9 @@ const totalDur = 2.5; // 每轮总时长（秒）
 
 // 漂浮免责声明
 const TIPS = [
-  '🎭 纯属娱乐，请勿当真~', '🤪 AI 胡说八道中...', '🌍 数据可能比地球还圆',
-  '😂 如有雷同，纯属巧合', '🎲 随机生成，概不负责', '🤖 AI 的脑洞比宇宙还大',
-  '🍕 最难吃的厕所？AI 说有！', '⚠️ 本站不对任何奇葩内容负责',
-  '🐧 企鹅肉不好吃，AI 编的', '🎪 欢迎来到奇葩世界博览会',
+  '🤪 AI 胡说八道中...', '🌍 AI 可能比地球还会圆',
+  '🐧 企鹅肉不好吃，AI 编的', '🤖 AI 的脑洞比宇宙还大',
+  '🍕 最难吃的厕所？AI 说有！', '🎪 欢迎来到奇葩世界博览会',
 ];
 const COLORS = ['rgba(255,200,100,0.7)','rgba(100,220,255,0.7)','rgba(255,120,180,0.7)','rgba(150,255,150,0.7)','rgba(255,255,255,0.6)'];
 const container = document.getElementById('float-tips');
@@ -522,8 +620,6 @@ const countryContinent = {
   Morocco:'Africa', Ethiopia:'Africa', Nigeria:'Africa', SouthAfrica:'Africa', Egypt:'Africa',
   Australia:'Oceania', NewZealand:'Oceania',
 };
-
-let allItems = [];
 
 function showRank() {
   if (!allItems.length) { alert('请先搜索一个主题'); return; }
