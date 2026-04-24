@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>世界奇探地图</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a1a; color: #fff; font-family: sans-serif; overflow: hidden; }
+
+  /* 右侧面板 */
+  #panel {
+    position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+    z-index: 10; display: flex; flex-direction: row; align-items: center;
+    transition: right 0.4s ease;
+  }
+  #panel.collapsed { right: -160px; }
+  #panel-content {
+    display: flex; flex-direction: column; gap: 16px; width: 160px;
+    background: rgba(10,10,26,0.7); padding: 16px 12px; border-radius: 12px 0 0 12px;
+    backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); border-right: none;
+  }
+  #panel-toggle {
+    width: 20px; height: 48px; background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2); border-right: none;
+    border-radius: 8px 0 0 8px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; color: #aaa; font-size: 12px;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  #panel-toggle:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+  .chip-group { display: flex; flex-direction: column; gap: 6px; }
+  .chip-label { font-size: 11px; color: rgba(255,255,255,0.4); padding-left: 4px; margin-bottom: 2px; }
+
+  .chip {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #fff; padding: 7px 14px; border-radius: 20px; cursor: pointer;
+    font-size: 13px; transition: all 0.2s; text-align: center;
+  }
+  .chip:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.4); }
+  .chip.active {
+    background: rgba(79,142,247,0.35);
+    border-color: #4f8ef7;
+    color: #7eb8ff;
+  }
+  .chip.disabled {
+    opacity: 0.3; cursor: not-allowed; pointer-events: none;
+  }
+
+  /* 顶部搜索栏 */
+  #topbar {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 10; display: flex; gap: 8px; align-items: center;
+  }
+  #query {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; padding: 9px 18px; border-radius: 24px; font-size: 14px;
+    width: 280px; outline: none; transition: border-color 0.2s;
+  }
+  #query:focus { border-color: #4f8ef7; }
+  #query::placeholder { color: rgba(255,255,255,0.35); }
+  #go {
+    background: linear-gradient(135deg, #4f8ef7, #7b5ea7);
+    border: none; color: #fff; padding: 9px 22px;
+    border-radius: 24px; cursor: pointer; font-size: 14px;
+    transition: opacity 0.2s;
+  }
+  #go:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  #globe { width: 100vw; height: 100vh; }
+
+  .label {
+    display: flex; flex-direction: column; align-items: center;
+    cursor: pointer; user-select: none; pointer-events: auto;
+  }
+  .label .icon { font-size: 28px; filter: drop-shadow(0 0 6px rgba(255,255,255,0.6)); }
+  .label .food-name {
+    font-size: 11px; color: #fff; background: rgba(0,0,0,0.55);
+    padding: 2px 6px; border-radius: 8px; margin-top: 2px; white-space: nowrap;
+  }
+
+  #card {
+    position: fixed; top: 0; left: 0;
+    background: rgba(10,10,30,0.93); border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 16px; padding: 20px 24px; min-width: 260px; max-width: 340px;
+    display: none; z-index: 20; backdrop-filter: blur(12px);
+  }
+  #card h2 { font-size: 20px; margin-bottom: 4px; }
+  #card .country { font-size: 12px; color: #888; margin-bottom: 10px; }
+  #card .desc { font-size: 13px; line-height: 1.8; color: #ccc; margin-bottom: 10px; white-space: pre-line; }
+  #card .roast { font-size: 13px; color: #f7c948; font-style: italic; margin-bottom: 14px; }
+  #ask-wrap { position: relative; margin-bottom: 6px; }
+  #ask-btn {
+    width: 100%; padding: 8px 0; border-radius: 10px; border: none; cursor: pointer;
+    background: linear-gradient(135deg, #0084ff, #7b5ea7);
+    color: #fff; font-size: 13px; font-weight: 500; transition: opacity 0.2s;
+  }
+  #ask-btn:hover { opacity: 0.85; }
+  #ask-menu {
+    display: none; position: absolute; top: 0; left: calc(100% + 8px);
+    width: 160px;
+    background: rgba(10,10,30,0.97); border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 10px; overflow: hidden;
+  }
+  #ask-menu.open { display: block; }
+  #zhida-btn, #publish-btn {
+    display: block; width: 100%; padding: 10px 14px; text-align: left;
+    background: none; border: none; border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: #fff; font-size: 13px; cursor: pointer; text-decoration: none;
+    transition: background 0.15s;
+  }
+  #zhida-btn:last-child, #publish-btn:last-child { border-bottom: none; }
+  #zhida-btn:hover, #publish-btn:hover { background: rgba(255,255,255,0.1); }
+  #share-btn {
+    width: 100%; padding: 8px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08); color: #ccc; font-size: 13px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  #share-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  #publish-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* 底部工具栏 */
+  #toolbar {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    z-index: 10; display: flex; gap: 10px;
+  }
+  .tool-btn {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; padding: 8px 18px; border-radius: 20px; cursor: pointer;
+    font-size: 13px; transition: all 0.2s; backdrop-filter: blur(8px);
+  }
+  .tool-btn:hover { background: rgba(255,255,255,0.2); }
+
+  /* 漂浮免责声明 */
+  .float-tip {
+    position: fixed; pointer-events: none; z-index: 5;
+    color: rgba(255,255,255,0.55); white-space: nowrap;
+    animation: floatDrift ease-in-out infinite;
+    user-select: none; font-weight: 600;
+  }
+  @keyframes floatDrift {
+    0%   { transform: translate(0, 0) rotate(var(--r)); opacity: 0.4; }
+    50%  { transform: translate(var(--dx), -22px) rotate(var(--r)); opacity: 0.7; }
+    100% { transform: translate(0, 0) rotate(var(--r)); opacity: 0.4; }
+  }
+
+  /* 排行榜弹窗 */
+  #rank-modal {
+    position: fixed; top: 50%; left: 20px; transform: translateY(-50%);
+    background: rgba(10,10,30,0.96); border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 16px; padding: 24px; width: 300px; max-height: 80vh;
+    overflow-y: auto; display: none; z-index: 30; backdrop-filter: blur(12px);
+  }
+  #rank-modal h3 { font-size: 16px; margin-bottom: 16px; color: #aaa; }
+  .rank-continent { margin-bottom: 16px; }
+  .rank-continent h4 { font-size: 13px; color: #4f8ef7; margin-bottom: 8px; }
+  .rank-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer; font-size: 13px;
+  }
+  .rank-item:hover { color: #7eb8ff; }
+  .rank-num { color: #555; width: 18px; text-align: right; font-size: 11px; }
+  #rank-close {
+    position: absolute; top: 12px; right: 16px;
+    background: none; border: none; color: #666; font-size: 16px; cursor: pointer;
+  }
+  #card-close {
+    position: absolute; top: 10px; right: 12px;
+    background: none; border: none; color: #666; font-size: 16px; cursor: pointer;
+  }
+  #card-close:hover { color: #fff; }
+
+  #loading {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 15px; color: #aaa; display: none; z-index: 30;
+    background: rgba(10,10,30,0.8); padding: 12px 24px; border-radius: 12px;
+  }
+  #loading span {
+    display: inline-block;
+    animation: charBounce 2.5s ease-in-out infinite;
+  }
+  @keyframes charBounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40%           { transform: translateY(-6px); }
+  }
+  .digger {
+    font-size: 28px; line-height: 1;
+    animation: dig 0.5s steps(2) infinite;
+    display: inline-block;
+  }
+  @keyframes dig {
+    0%   { transform: rotate(-15deg) translateY(0); }
+    50%  { transform: rotate(15deg) translateY(3px); }
+    100% { transform: rotate(-15deg) translateY(0); }
+  }
+  @media (max-width: 768px) {
+    #card {
+      position: fixed !important; left: 10px !important; right: 10px !important;
+      bottom: 10px !important; top: auto !important; width: auto !important;
+      max-width: none !important;
+    }
+    #rank-modal { left: 10px; right: 10px; width: auto; top: auto; bottom: 10px; transform: none; }
+    #panel { display: none; }
+    #topbar { width: 90%; }
+    #query { width: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <input id="query" type="text" placeholder="输入任意主题探索世界…">
+  <button id="go" onclick="search()">探索 🌍</button>
+</div>
+
+<!-- 右侧拼接面板 -->
+<div id="panel">
+  <div id="panel-toggle" onclick="togglePanel()">‹</div>
+  <div id="panel-content">
+    <div class="chip-group">
+      <div class="chip-label">🌏</div>
+      <div class="chip" onclick="toggleAdj(this,'最辣')">🌶 最辣</div>
+      <div class="chip" onclick="toggleAdj(this,'最奇葩')">🤪 最奇葩</div>
+      <div class="chip" onclick="toggleAdj(this,'最可爱')">🥰 最可爱</div>
+      <div class="chip" onclick="toggleAdj(this,'最难吃')">🤢 最难吃</div>
+      <div class="chip" onclick="toggleAdj(this,'最高的')">🏔 最高的</div>
+    </div>
+    <div class="chip-group">
+      <div class="chip-label">👀</div>
+      <div class="chip" onclick="toggleNoun(this,'的食物')">🍜 食物</div>
+      <div class="chip" onclick="toggleNoun(this,'的酒店')">🏨 酒店</div>
+      <div class="chip" onclick="toggleNoun(this,'的辣椒')">🌶 辣椒</div>
+      <div class="chip" onclick="toggleNoun(this,'的厕所')">🚽 厕所</div>
+      <div class="chip" onclick="toggleNoun(this,'的动物')">🐾 动物</div>
+    </div>
+  </div>
+</div>
+
+<div id="globe"></div>
+<div id="loading"></div>
+<div id="float-tips"></div>
+
+<!-- 底部工具栏 -->
+<div id="toolbar">
+  <button class="tool-btn" onclick="randomSearch()">🎲 随机探索</button>
+  <button class="tool-btn" onclick="showRank()">🏆 排行榜</button>
+</div>
+
+<!-- 排行榜弹窗 -->
+<div id="rank-modal">
+  <button id="rank-close" onclick="document.getElementById('rank-modal').style.display='none'">✕</button>
+  <h3 id="rank-title">排行榜</h3>
+  <div id="rank-body"></div>
+</div>
+
+<div id="card">
+  <button id="card-close" onclick="closeCard()">✕</button>
+  <h2 id="card-emoji-name"></h2>
+  <div class="country" id="card-country"></div>
+  <div class="desc" id="card-desc"></div>
+  <div class="roast" id="card-roast"></div>
+  <div id="ask-wrap">
+    <button id="ask-btn" onclick="toggleAskMenu()">💬 去问一问</button>
+    <div id="ask-menu">
+      <a id="zhida-btn" href="#" target="_blank" onclick="document.getElementById('ask-menu').classList.remove('open')">🤖 问问硅基生命</a>
+      <button id="publish-btn" onclick="openZhihuPublish()">🧠 问问碳基智慧</button>
+    </div>
+  </div>
+  <button id="share-btn" onclick="shareCard()">📸 分享卡片</button>
+  <div id="qr-box" style="display:none;margin-top:10px;display:flex;gap:12px;justify-content:center">
+    <div style="text-align:center">
+      <div id="qr-code"></div>
+      <div style="font-size:11px;color:#888;margin-top:4px">扫码直达知乎直答</div>
+    </div>
+    <div style="text-align:center">
+      <div id="qr-site"></div>
+      <div style="font-size:11px;color:#888;margin-top:4px">访问本站</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/globe.gl@2.30.0/dist/globe.gl.min.js"></script>
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+const globe = Globe()
+  .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+  .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+  .htmlElementsData([])
+  .htmlElement(d => {
+    const el = document.createElement('div');
+    if (d.name === '') {
+      // 挖土小人
+      el.innerHTML = `<div class="digger">${d.emoji}</div>`;
+      el.style.pointerEvents = 'none';
+      return el;
+    }
+    el.className = 'label';
+    el.innerHTML = `<div class="icon">${d.emoji}</div><div class="food-name">${d.name}</div>`;
+    el.onclick = (e) => showCard(d, e);
+    return el;
+  })
+  .htmlLat(d => d.lat)
+  .htmlLng(d => d.lng)
+  (document.getElementById('globe'));
+
+const canvas = globe.renderer().domElement;
+const htmlLayer = canvas.parentElement.querySelector('div');
+if (htmlLayer) htmlLayer.style.pointerEvents = 'auto';
+
+globe.controls().autoRotate = true;
+globe.controls().autoRotateSpeed = 0.4;
+
+// 拼接词状态
+let allItems = [];
+
+let selAdj = '', selNoun = '';
+let panelTimer = null;
+
+// 2s 后自动收起面板
+function scheduleCollapse() {
+  clearTimeout(panelTimer);
+  panelTimer = setTimeout(() => {
+    document.getElementById('panel').classList.add('collapsed');
+    document.getElementById('panel-toggle').textContent = '›';
+  }, 2000);
+}
+
+function togglePanel() {
+  const panel = document.getElementById('panel');
+  const btn = document.getElementById('panel-toggle');
+  if (panel.classList.contains('collapsed')) {
+    panel.classList.remove('collapsed');
+    btn.textContent = '‹';
+    // 只有鼠标不在面板上时才启动计时
+    if (!panel.matches(':hover')) scheduleCollapse();
+  } else {
+    panel.classList.add('collapsed');
+    btn.textContent = '›';
+    clearTimeout(panelTimer);
+  }
+}
+
+// 页面加载 2s 后自动收起
+scheduleCollapse();
+
+// 鼠标悬浮时暂停收起，离开时重新计时
+document.getElementById('panel').addEventListener('mouseenter', () => clearTimeout(panelTimer));
+document.getElementById('panel').addEventListener('mouseleave', () => {
+  if (!document.getElementById('panel').classList.contains('collapsed')) scheduleCollapse();
+});
+
+// 形容词 → 相关主题映射
+const NOUN_MAP = {
+  '最好吃': [['🍎 水果','的水果'],['🍞 面包','的面包'],['🍜 食物','的食物'],['🍰 甜点','的甜点'],['🥩 肉类','的肉类']],
+  '最难吃': [['🍜 食物','的食物'],['🐟 海鲜','的海鲜'],['🧀 奶酪','的奶酪'],['🥬 蔬菜','的蔬菜'],['🍵 饮料','的饮料']],
+  '最辣':   [['🌶 辣椒','的辣椒'],['🍜 食物','的食物'],['🍛 咖喱','的咖喱'],['🥘 炖菜','的炖菜'],['🍕 小吃','的街头小吃']],
+  '最高的': [['🏔 山','的山'],['🌊 湖','的湖'],['🏙 建筑','的建筑'],['🌲 树','的树'],['🧗 人','的人']],
+  '最奇葩': [['🚽 厕所','的厕所'],['🏨 酒店','的酒店'],['🐾 动物','的动物'],['⚖️ 法律','的法律'],['🎭 节日','的节日']],
+  '最可爱': [['🐾 动物','的动物'],['🌸 植物','的植物'],['🍰 工作','的工作'],['👶 婴儿','的婴儿用品'],['🐱 宠物','的宠物']],
+  '最危险': [['🐾 动物','的动物'],['🌋 地方','的地方'],['🍄 植物','的植物'],['🏄 运动','的运动'],['🦠 生物','的生物']],
+};
+const DEFAULT_NOUNS = [['🍜 食物','的食物'],['🏨 酒店','的酒店'],['🌶 辣椒','的辣椒'],['🚽 厕所','的厕所'],['🐾 动物','的动物']];
+
+// 初始化名词置灰（需在 DOM 加载后执行）
+document.addEventListener('DOMContentLoaded', () => updateNouns(''));
+
+function updateNouns(adj) {
+  const nouns = NOUN_MAP[adj] || DEFAULT_NOUNS;
+  const group = document.querySelectorAll('.chip-group')[1];
+  const chips = group.querySelectorAll('.chip');
+  const disabled = !adj;
+  nouns.forEach(([label, val], i) => {
+    if (chips[i]) {
+      chips[i].textContent = label;
+      chips[i].onclick = function() { toggleNoun(this, val); };
+      chips[i].classList.remove('active');
+      chips[i].classList.toggle('disabled', disabled);
+    }
+  });
+  selNoun = '';
+}
+
+function toggleAdj(el, val) {
+  document.querySelectorAll('.chip-group:nth-child(1) .chip').forEach(c => c.classList.remove('active'));
+  if (selAdj === val) { selAdj = ''; updateNouns(''); }
+  else { selAdj = val; el.classList.add('active'); updateNouns(val); }
+  syncQuery();
+}
+
+function toggleNoun(el, val) {
+  document.querySelectorAll('.chip-group:nth-child(2) .chip').forEach(c => c.classList.remove('active'));
+  if (selNoun === val) { selNoun = ''; }
+  else { selNoun = val; el.classList.add('active'); }
+  syncQuery();
+  if (selAdj && selNoun) search();
+}
+
+function syncQuery() {
+  if (selAdj || selNoun) {
+    document.getElementById('query').value = '世界上' + selAdj + selNoun;
+  }
+}
+
+async function search() {
+  const q = document.getElementById('query').value.trim();
+  if (!q) return;
+  document.getElementById('go').disabled = true;
+  document.getElementById('loading').style.display = 'block';
+  closeCard();
+
+  // 在地球上随机位置显示挖土小人
+  const digger = {
+    lat: (Math.random() - 0.5) * 160,
+    lng: (Math.random() - 0.5) * 360,
+    emoji: '⛏️',
+    name: ''
+  };
+  globe.htmlElementsData([digger]);
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q })
+    });
+    const items = await res.json();
+    allItems = items;
+    globe.htmlElementsData(items);
+  } catch(e) {
+    alert('请求失败：' + e.message);
+    globe.htmlElementsData([]);
+  } finally {
+    document.getElementById('go').disabled = false;
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+let currentItem = null;
+let siteUrl = 'https://your-domain.com';
+
+fetch('/api/config').then(r => r.json()).then(d => { if (d.siteUrl) siteUrl = d.siteUrl; });
+
+function showCard(d, e) {
+  currentItem = d;
+  const card = document.getElementById('card');
+  document.getElementById('card-emoji-name').textContent = d.emoji + ' ' + d.name;
+  document.getElementById('card-country').textContent = d.country;
+  document.getElementById('card-desc').textContent = d.desc;
+  document.getElementById('card-roast').textContent = '💬 ' + d.roast;
+
+  const q = encodeURIComponent(d.searchQuery || d.name);
+  document.getElementById('zhida-btn').href =
+    `https://zhida.zhihu.com/search?q=${q}&quiz=QT_CHAT&messageSourceType=text&chatMode=FAST`;
+
+  document.getElementById('ask-menu').classList.remove('open');
+  card.style.display = 'block';
+  globe.controls().autoRotate = false;
+
+  const cw = card.offsetWidth || 280;
+  const ch = card.offsetHeight || 180;
+  if (e) {
+    let x = e.clientX + 12;
+    let y = e.clientY + 12;
+    if (x + cw > window.innerWidth) x = e.clientX - cw - 12;
+    if (y + ch > window.innerHeight) y = e.clientY - ch - 12;
+    card.style.left = x + 'px';
+    card.style.top = y + 'px';
+  } else {
+    // 从排行榜点击，显示在右侧避开地球
+    card.style.left = (window.innerWidth - cw - 40) + 'px';
+    card.style.top = ((window.innerHeight - ch) / 2) + 'px';
+  }
+}
+
+function closeCard() {
+  document.getElementById('card').style.display = 'none';
+  document.getElementById('ask-menu').classList.remove('open');
+  globe.controls().autoRotate = true;
+}
+
+function toggleAskMenu() {
+  document.getElementById('ask-menu').classList.toggle('open');
+}
+
+function openZhihuPublish() {
+  document.getElementById('ask-menu').classList.remove('open');
+  window.open('https://www.zhihu.com/creator', '_blank');
+}
+
+// 点击其他地方关闭弹窗
+document.addEventListener('click', e => {
+  const card = document.getElementById('card');
+  if (card.style.display !== 'none' && !card.contains(e.target) && !e.target.closest('.label')) {
+    closeCard();
+  }
+  const askWrap = document.getElementById('ask-wrap');
+  if (!askWrap.contains(e.target)) {
+    document.getElementById('ask-menu').classList.remove('open');
+  }
+});
+
+// 分享卡片
+async function shareCard() {
+  const card = document.getElementById('card');
+  const qrBox = document.getElementById('qr-box');
+  const qrEl = document.getElementById('qr-code');
+
+  // 生成二维码
+  qrEl.innerHTML = '';
+  const q = encodeURIComponent(currentItem ? (currentItem.searchQuery || currentItem.name) : '');
+  const zhidaUrl = `https://zhida.zhihu.com/search?q=${q}&quiz=QT_CHAT&messageSourceType=text&chatMode=FAST`;
+  new QRCode(qrEl, { text: zhidaUrl, width: 100, height: 100, colorDark: '#fff', colorLight: '#0a0a1a' });
+
+  const qrSite = document.getElementById('qr-site');
+  qrSite.innerHTML = '';
+  new QRCode(qrSite, { text: siteUrl, width: 100, height: 100, colorDark: '#fff', colorLight: '#0a0a1a' });
+
+  qrBox.style.display = 'flex';
+
+  await new Promise(r => setTimeout(r, 100)); // 等待二维码渲染
+
+  try {
+    const canvas = await html2canvas(card, { backgroundColor: '#0a0a1a', useCORS: true });
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'world-explorer-card.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  } catch(e) {
+    alert('截图失败：' + e.message);
+  } finally {
+    qrBox.style.display = 'none';
+  }
+}
+
+// 回车搜索
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') search();
+});
+
+// 初始化 loading 逐字动画
+const loadingText = '⛏️ 别急啊，这个球太大了，在找…';
+const loadingEl = document.getElementById('loading');
+const totalDur = 2.5; // 每轮总时长（秒）
+[...loadingText].forEach((ch, i) => {
+  const span = document.createElement('span');
+  span.textContent = ch;
+  span.style.animationDelay = `${i * 0.1}s`;
+  loadingEl.appendChild(span);
+});
+
+// 漂浮免责声明
+const TIPS = [
+  '🤪 AI 胡说八道中...', '🌍 AI 可能比地球还会圆',
+  '🐧 企鹅肉不好吃，AI 编的', '🤖 AI 的脑洞比宇宙还大',
+  '🍕 最难吃的厕所？AI 说有！', '🎪 欢迎来到奇葩世界博览会',
+];
+const COLORS = ['rgba(255,200,100,0.7)','rgba(100,220,255,0.7)','rgba(255,120,180,0.7)','rgba(150,255,150,0.7)','rgba(255,255,255,0.6)'];
+const container = document.getElementById('float-tips');
+TIPS.forEach((text, i) => {
+  const el = document.createElement('div');
+  el.className = 'float-tip';
+  el.textContent = text;
+  // 避开地球中心区域（25%-75% x, 20%-80% y），分布在四周
+  // 左侧 65%，其余各区域约 12%
+  const zones = [
+    [2, 20, 2, 95],   // 左侧（权重高）
+    [2, 20, 2, 95],   // 左侧（重复增加概率）
+    [2, 20, 2, 95],   // 左侧
+    [2, 20, 2, 95],   // 左侧
+    [2, 20, 2, 95],   // 左侧
+    [2, 20, 2, 95],   // 左侧
+    [2, 20, 2, 95],   // 左侧（7/10 ≈ 70%）
+    [78, 96, 2, 95],  // 右侧
+    [20, 78, 2, 18],  // 顶部
+    [20, 78, 82, 96], // 底部
+  ];
+  const z = zones[Math.floor(Math.random() * zones.length)];
+  const x = z[0] + Math.random() * (z[1] - z[0]);
+  const y = z[2] + Math.random() * (z[3] - z[2]);
+  const r = (Math.random() - 0.5) * 20;
+  const dx = (Math.random() - 0.5) * 40;
+  const dur = 5 + Math.random() * 4;
+  const delay = Math.random() * 5;
+  const size = 14 + Math.floor(Math.random() * 14);
+  const color = COLORS[i % COLORS.length];
+  el.style.cssText = `left:${x}%;top:${y}%;--r:${r}deg;--dx:${dx}px;animation-duration:${dur}s;animation-delay:-${delay}s;font-size:${size}px;color:${color}`;
+  container.appendChild(el);
+});
+
+// 随机探索
+const ADJS = ['最辣','最奇葩','最可爱','最难吃','最贵','最危险','最治愈','最恐怖','最浪漫','最古老','最臭','最神秘'];
+const NOUNS = ['的食物','的酒店','的厕所','的动物','的植物','的节日','的法律','的职业','的甜点','的街头小吃'];
+function randomSearch() {
+  const adj = ADJS[Math.floor(Math.random() * ADJS.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  document.getElementById('query').value = '世界上' + adj + noun;
+  search();
+}
+
+const continentMap = {
+  Asia: '亚洲', Europe: '欧洲', Africa: '非洲',
+  NorthAmerica: '北美洲', SouthAmerica: '南美洲',
+  Oceania: '大洋洲', Antarctica: '南极洲'
+};
+const countryContinent = {
+  China:'Asia', Japan:'Asia', India:'Asia', SouthKorea:'Asia', Thailand:'Asia',
+  Vietnam:'Asia', Indonesia:'Asia', Turkey:'Asia', SaudiArabia:'Asia', Iran:'Asia',
+  France:'Europe', Sweden:'Europe', Italy:'Europe', Spain:'Europe', Germany:'Europe',
+  Greece:'Europe', Portugal:'Europe', Russia:'Europe', Poland:'Europe', UnitedKingdom:'Europe',
+  UnitedStates:'NorthAmerica', Canada:'NorthAmerica', Mexico:'NorthAmerica',
+  Brazil:'SouthAmerica', Argentina:'SouthAmerica', Peru:'SouthAmerica', Colombia:'SouthAmerica', Chile:'SouthAmerica',
+  Morocco:'Africa', Ethiopia:'Africa', Nigeria:'Africa', SouthAfrica:'Africa', Egypt:'Africa',
+  Australia:'Oceania', NewZealand:'Oceania',
+};
+
+function showRank() {
+  if (!allItems.length) { alert('请先搜索一个主题'); return; }
+  const groups = {};
+  allItems.forEach(d => {
+    const c = countryContinent[d.country] || 'Other';
+    if (!groups[c]) groups[c] = [];
+    groups[c].push(d);
+  });
+  const q = document.getElementById('query').value;
+  document.getElementById('rank-title').textContent = `🏆 ${q}`;
+  const body = document.getElementById('rank-body');
+  body.innerHTML = '';
+  Object.entries(groups).forEach(([cont, items]) => {
+    const label = continentMap[cont] || cont;
+    const div = document.createElement('div');
+    div.className = 'rank-continent';
+    div.innerHTML = `<h4>${label}</h4>` + items.map((d, i) =>
+      `<div class="rank-item" onclick="globe.pointOfView({lat:${d.lat},lng:${d.lng},altitude:1.5},800);document.getElementById('rank-modal').style.display='none';setTimeout(()=>{const sc=globe.getScreenCoords(${d.lat},${d.lng});showCard(${JSON.stringify(d).replace(/"/g,'&quot;')},sc?{clientX:sc.x,clientY:sc.y}:null)},900)">
+        <span class="rank-num">${i+1}</span>
+        <span>${d.emoji}</span>
+        <span>${d.name}</span>
+        <span style="color:#555;margin-left:auto;font-size:11px">${d.country}</span>
+      </div>`
+    ).join('');
+    body.appendChild(div);
+  });
+  document.getElementById('rank-modal').style.display = 'block';
+}
+</script>
+</body>
+</html>
