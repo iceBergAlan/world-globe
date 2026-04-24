@@ -199,13 +199,29 @@
   @media (max-width: 768px) {
     #card {
       position: fixed !important; left: 10px !important; right: 10px !important;
-      bottom: 10px !important; top: auto !important; width: auto !important;
+      bottom: 80px !important; top: auto !important; width: auto !important;
       max-width: none !important;
     }
-    #rank-modal { left: 10px; right: 10px; width: auto; top: auto; bottom: 10px; transform: none; }
-    #panel { display: none; }
+    #rank-modal { left: 10px; right: 10px; width: auto; top: auto; bottom: 80px; transform: none; }
+    #panel {
+      display: block !important;
+      position: fixed; bottom: 0; left: 0; right: 0; top: auto;
+      transform: none; width: 100%;
+      flex-direction: column;
+    }
+    #panel-toggle { display: none; }
+    #panel-content {
+      display: flex; flex-direction: row; gap: 8px; width: 100%;
+      overflow-x: auto; padding: 8px 12px;
+      border-radius: 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);
+      flex-wrap: nowrap;
+    }
+    #panel.collapsed { right: 0 !important; }
+    .chip-group { flex-direction: row; gap: 6px; flex-shrink: 0; }
+    .chip-label { display: none; }
     #topbar { width: 90%; }
-    #query { width: 200px; }
+    #query { width: 180px; }
+  }
   }
 </style>
 </head>

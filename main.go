@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -126,11 +127,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 记录每个国家出现次数，给重叠的点加偏移
+	countryCount := map[string]int{}
 	for i := range items {
 		key := strings.ReplaceAll(items[i].Country, " ", "")
 		if coord, ok := countryMap[key]; ok {
-			items[i].Lat = coord[0]
-			items[i].Lng = coord[1]
+			n := countryCount[key]
+			countryCount[key]++
+			angle := float64(n) * 2.5
+			offset := 1.5
+			items[i].Lat = coord[0] + offset*math.Sin(angle)
+			items[i].Lng = coord[1] + offset*math.Cos(angle)
 		}
 	}
 
