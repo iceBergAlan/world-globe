@@ -298,6 +298,8 @@
   </div>
 </div>
 
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<model-viewer src="/Meshy_AI_Grooming_Day_0426140008_texture.glb" auto-rotate camera-controls shadow-intensity="1" style="position:fixed;top:70px;left:16px;width:110px;height:130px;z-index:15;background:transparent;--poster-color:transparent;"></model-viewer>
 <script src="https://unpkg.com/globe.gl@2.30.0/dist/globe.gl.min.js"></script>
 <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
@@ -592,13 +594,11 @@ TIPS.forEach((text, i) => {
   // 避开地球中心区域（25%-75% x, 20%-80% y），分布在四周
   // 左侧 65%，其余各区域约 12%
   const zones = [
-    [2, 20, 2, 95],   // 左侧（权重高）
-    [2, 20, 2, 95],   // 左侧（重复增加概率）
     [2, 20, 2, 95],   // 左侧
     [2, 20, 2, 95],   // 左侧
     [2, 20, 2, 95],   // 左侧
-    [2, 20, 2, 95],   // 左侧
-    [2, 20, 2, 95],   // 左侧（7/10 ≈ 70%）
+    [78, 96, 2, 95],  // 右侧
+    [78, 96, 2, 95],  // 右侧
     [78, 96, 2, 95],  // 右侧
     [20, 78, 2, 18],  // 顶部
     [20, 78, 82, 96], // 底部
